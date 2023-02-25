@@ -1,7 +1,5 @@
 # Egg_Counter
 > Industrial Project for Egg-Counter in Poultry Farm
->
-> Prototype
 
 ## Parts
 * 3D Modeling of Enclosure
