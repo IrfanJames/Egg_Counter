@@ -1,0 +1,59 @@
+const int no_Of_Sensors = 3;
+const int Counter_Pins[no_Of_Sensors] = {32, 34, 35}; // Pins
+const unsigned long one_EGG_Time_ms = 2000;
+volatile int egg_Count = 0;
+volatile unsigned long time_Up[no_Of_Sensors] = {0, 0, 0};
+const int MIN_OBJECT_TIME = 100; // Minimum time object must be detected to count as egg (ms)
+
+void Edge_Detected(int serial) {
+  static bool objectDetected = false;
+  bool newDetection = !digitalRead(Counter_Pins[serial]);
+
+  if (newDetection != objectDetected) {
+    if (newDetection) {
+      // Object detected
+      unsigned long time = millis();
+      time_Up[serial] = time;
+      Serial.printf("Object Detected on Sensor %d at %lu ms\n", serial, time);
+    } else {
+      // Object passed
+      unsigned long time = millis();
+      unsigned long objectTime = time - time_Up[serial];
+      if (objectTime >= MIN_OBJECT_TIME) {
+        // Object is an egg
+        int numEggs = objectTime / one_EGG_Time_ms;
+        time_Up[serial] += numEggs * one_EGG_Time_ms;
+        if (objectTime % one_EGG_Time_ms >= 0.9 * one_EGG_Time_ms) {
+          numEggs++;
+          time_Up[serial] += one_EGG_Time_ms;
+        }
+        egg_Count += numEggs;
+        Serial.printf("Object Passed on Sensor %d at %lu ms, counted %d eggs\n", serial, time, numEggs);
+      } else {
+        // Object is not an egg
+        Serial.printf("Object Passed on Sensor %d at %lu ms, not counted as egg (object time = %lu ms)\n", serial, time, objectTime);
+      }
+    }
+    objectDetected = newDetection;
+  }
+}
+
+void Handle_0() { Edge_Detected(0); }
+void Handle_1() { Edge_Detected(1); }
+void Handle_2() { Edge_Detected(2); }
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(Counter_Pins[0], INPUT_PULLUP);
+  pinMode(Counter_Pins[1], INPUT_PULLUP);
+  pinMode(Counter_Pins[2], INPUT_PULLUP);
+
+  attachInterrupt(digitalPinToInterrupt(Counter_Pins[0]), Handle_0, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(Counter_Pins[1]), Handle_1, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(Counter_Pins[2]), Handle_2, CHANGE);
+}
+
+void loop() {
+  Serial.printf("Egg Count: %d\n", egg_Count);
+}

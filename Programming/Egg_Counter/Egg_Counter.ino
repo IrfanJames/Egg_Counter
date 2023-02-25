@@ -1,86 +1,97 @@
-const int IR_Sensor_Count = 1; //3;
-int IR[IR_Sensor_Count] = {32}; // 34, 35};
-const unsigned long one_EGG_Time_ms = 6000;
-unsigned long time_Up = millis();
-int egg_Count = 0;
+const int NUM_SENSORS = 15;
+const int SENSOR_PINS[NUM_SENSORS] = {1, 2, 3, 4,5,6,7,8,9,10,11,12,13,14,15/* ... */ };
+unsigned long ONE_EGG_TIME_MS = 2000;
+unsigned long MARGIN_US = 200000;
+volatile int eggCount = 0;
 
-bool Sense();
-bool Count();
+class Sensor {
+  public:
+    Sensor(int pin) : pin_(pin), timeUp_(0) {}
+    void handle() {
+      static bool objectDetected = false;
+      bool newDetection = !digitalRead(pin_);
 
-bool edge = false;
+      // Debounce logic to ignore false positives
+      static unsigned long lastDetectionTime = 0;
+      unsigned long currentDetectionTime = millis();
+      if (newDetection && !objectDetected && (currentDetectionTime - lastDetectionTime) > 50) {
+        // Object detected
+        timeUp_ = micros();
+        Serial.print("\tObject Detected");
+      } else if (!newDetection && objectDetected) {
+        // Object passed
+        unsigned long egg_time_us = micros() - timeUp_;
+        Serial.print("\tObject Passed, egg time: ");
+        Serial.print(egg_time_us);
+
+        // Update average egg time
+        avgEggTimeMs = (avgEggTimeMs * eggCount + egg_time_us / 1000) / (eggCount + 1);
+
+        // Adjust ONE_EGG_TIME_MS and MARGIN_US if necessary
+        unsigned long margin_adjustment = 0;
+        if (egg_time_us > (ONE_EGG_TIME_MS + MARGIN_US)) {
+          // Eggs are taking too long, reduce ONE_EGG_TIME_MS and MARGIN_US by 5%
+          ONE_EGG_TIME_MS *= 0.95;
+          MARGIN_US *= 0.95;
+          margin_adjustment = 1;
+        } else if (egg_time_us < (ONE_EGG_TIME_MS - MARGIN_US)) {
+          // Eggs are too fast, increase ONE_EGG_TIME_MS and MARGIN_US by 5%
+          ONE_EGG_TIME_MS *= 1.05;
+          MARGIN_US *= 1.05;
+          margin_adjustment = -1;
+        }
+
+        eggCount++;
+        Serial.print(", egg count: ");
+        Serial.print(eggCount);
+        Serial.print(", avg egg time: ");
+        Serial.print(avgEggTimeMs);
+        Serial.print(", ONE_EGG_TIME_MS: ");
+        Serial.print(ONE_EGG_TIME_MS);
+        Serial.print(", MARGIN_US: ");
+        Serial.print(MARGIN_US);
+        Serial.print(", margin adjustment: ");
+        Serial.print(margin_adjustment);
+      }
+      objectDetected = newDetection;
+      lastDetectionTime = currentDetectionTime;
+    }
+  private:
+    int pin_;
+    unsigned long timeUp_;
+};
+
+Sensor sensors[NUM_SENSORS] = {
+  Sensor(SENSOR_PINS[0]),
+  Sensor(SENSOR_PINS[1]),
+  Sensor(SENSOR_PINS[2]),
+  Sensor(SENSOR_PINS[3]),
+  Sensor(SENSOR_PINS[4]),
+  Sensor(SENSOR_PINS[5]),
+  Sensor(SENSOR_PINS[6]),
+  Sensor(SENSOR_PINS[7]),
+  Sensor(SENSOR_PINS[8]),
+  Sensor(SENSOR_PINS[9]),
+  Sensor(SENSOR_PINS[10]),
+  Sensor(SENSOR_PINS[11]),
+  Sensor(SENSOR_PINS[12]),
+  Sensor(SENSOR_PINS[13]),
+  Sensor(SENSOR_PINS[14])
+  // ... and so on for the rest of the sensors
+};
 
 void setup() {
   Serial.begin(115200);
 
-  for (int i = 0; i < IR_Sensor_Count; i++)
-    pinMode(IR[i], INPUT);
+  for (int i = 0; i < NUM_SENSORS; i++) {
+    attachInterrupt(digitalPinToInterrupt(sensors[i].pin_), sensors[i].handle, CHANGE);
+  }
 }
 
 void loop() {
-  Serial.printf("\nEgg Count: %d\t", egg_Count);
-  Serial.print(millis());
-  Serial.print(" - ");
-  Serial.print(time_Up);
-  Serial.print(" = ");
-  Serial.print(millis() - time_Up);
-  
-  if (Sense() == false) {
-    if (edge == true) {
-      Count();
-      Serial.print("\tObject Passed");
-    }
-    else
-      Serial.print("\tNo Object Detected");
-    edge = false;
+  for (int i = 0; i < NUM_SENSORS; i++) {
+    sensors[i].handle();
   }
-  else {
-    if (edge == false) {
-      time_Up = millis();
-      Serial.print("\tObject Detected");
-    }
-    else    
-      Serial.print("\tObject Passing");
-    
-    edge = true;
-  }
-}
-
-
-bool Sense() {
-  // Check through every IR Sensor
-  // Returns 1 if even one of the sensors deect an object
-
-  for (int i = 0; i < IR_Sensor_Count; i++)
-    if (digitalRead(IR[i]) == LOW)
-      return 1;
   
-  return 0;
-}
-
-bool Count() {
-  // This Functions gets evoked when no object is detected
-  // If the past HIGH-Time (time when sensors constantly detected an object) is
-  // long enough (~one_EGG_Time_ms) the egg_Count increments
-
-  // If the past HIGH-Time (time when sensors constantly detected an object) is
-  // twice the (~one_EGG_Time_ms * k) the egg_Count incremented by k
-  
-  unsigned long time = millis() - time_Up;
-  Serial.print("\t In Count: ");
-  Serial.print(time);
-
-  float margin = 0.1; // 0.1 == 10%
-  float k = (double)time / (double)one_EGG_Time_ms;
-  
-  Serial.print("\t, k: ");
-  Serial.print(k);
-  Serial.print(", int(k): ");
-  Serial.print(int(k));
-  
-  if (k < abs(1.0f - margin))
-    return 0;
-  else {
-    egg_Count += (int)abs(k); // (int)k = no 0f eggs passed
-    return 1;
-  }
+  Serial.printf("\nEgg Count: %d\t", eggCount);
 }

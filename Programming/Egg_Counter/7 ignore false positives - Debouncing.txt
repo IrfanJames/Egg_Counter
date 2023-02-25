@@ -1,0 +1,81 @@
+const int NUM_SENSORS = 3;
+const int SENSOR_PINS[NUM_SENSORS] = {32, 34, 35}; // Pins
+unsigned long ONE_EGG_TIME_MS = 2000;
+unsigned long MARGIN_US = 200000;
+volatile int eggCount = 0;
+unsigned long timeUp[NUM_SENSORS] = {0, 0, 0};
+unsigned long avgEggTimeMs = 0;
+
+void Edge_Detected(int serial) {
+  static bool objectDetected = false;
+  bool newDetection = !digitalRead(Counter_Pins[serial]);
+
+  // Debounce logic to ignore false positives
+  static unsigned long lastDetectionTime = 0;
+  unsigned long currentDetectionTime = millis();
+  if (newDetection && !objectDetected && (currentDetectionTime - lastDetectionTime) > 50) {
+    // Object detected
+    time_Up[serial] = micros();
+    Serial.print("\tObject Detected");
+  } else if (!newDetection && objectDetected) {
+    // Object passed
+    unsigned long egg_time_us = micros() - time_Up[serial];
+    Serial.print("\tObject Passed, egg time: ");
+    Serial.print(egg_time_us);
+
+    // Update average egg time
+    avg_egg_time_ms = (avg_egg_time_ms * egg_Count + egg_time_us / 1000) / (egg_Count + 1);
+
+    // Adjust one_EGG_Time_ms and margin_us if necessary
+    unsigned long margin_adjustment = 0;
+    if (egg_time_us > (one_EGG_Time_ms + margin_us)) {
+      // Eggs are taking too long, reduce one_EGG_Time_ms and margin_us by 5%
+      one_EGG_Time_ms *= 0.95;
+      margin_us *= 0.95;
+      margin_adjustment = 1;
+    } else if (egg_time_us < (one_EGG_Time_ms - margin_us)) {
+      // Eggs are too fast, increase one_EGG_Time_ms and margin_us by 5%
+      one_EGG_Time_ms *= 1.05;
+      margin_us *= 1.05;
+      margin_adjustment = -1;
+    }
+
+    egg_Count++;
+    Serial.print(", egg count: ");
+    Serial.print(egg_Count);
+    Serial.print(", avg egg time: ");
+    Serial.print(avg_egg_time_ms);
+    Serial.print(", one_EGG_Time_ms: ");
+    Serial.print(one_EGG_Time_ms);
+    Serial.print(", margin_us: ");
+    Serial.print(margin_us);
+    Serial.print(", margin adjustment: ");
+    Serial.print(margin_adjustment);
+  }
+  objectDetected = newDetection;
+  lastDetectionTime = currentDetectionTime;
+}
+
+void handleSensor0() { 
+  edgeDetected(0); 
+}
+
+void handleSensor1() { 
+  edgeDetected(1); 
+}
+
+void handleSensor2() { 
+  edgeDetected(2); 
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  attachInterrupt(digitalPinToInterrupt(SENSOR_PINS[0]), handleSensor0, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(SENSOR_PINS[1]), handleSensor1, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(SENSOR_PINS[2]), handleSensor2, CHANGE);
+}
+
+void loop() {
+  Serial.printf("\nEgg Count: %d\t", eggCount);
+}

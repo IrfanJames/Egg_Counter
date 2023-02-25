@@ -1,0 +1,69 @@
+const unsigned long one_EGG_Time_ms = 2000;
+volatile int egg_Count = 0;
+
+class Egg_Counter {
+  int _pin;
+  unsigned long _time_Up = 0;
+public:
+  Egg_Counter (int pin) {
+    _pin = pin;
+    attachInterrupt(digitalPinToInterrupt(_pin), Edge_Detected, CHANGE);
+  }
+
+  void Edge_Detected () {
+
+    bool objectDetected = !(digitalRead(_pin));
+
+    if (objectDetected == true) {
+      // Whenever Object is Detected
+      // Start measuring time
+      
+      _time_Up = millis();
+      Serial.print("\tObject Detected");
+    }
+    else {
+      // After Object has Passed
+      // Check if the Up-Time (time when sensors constantly detected an object)
+      // was long enough (>= ~one_EGG_Time_ms)
+      
+      Count();
+      Serial.print("\tObject Passed");
+    }
+  }
+
+  bool Count() {
+    // This Functions gets evoked when no object is detected
+    // If the past HIGH-Time (time when sensors constantly detected an object) is
+    // long enough (~one_EGG_Time_ms) the egg_Count increments
+    // If the past HIGH-Time (time when sensors constantly detected an object) is
+    // twice the (~one_EGG_Time_ms * k) the egg_Count incremented by k
+
+    unsigned long time = millis() - _time_Up;
+    Serial.print("\t In Count: ");  Serial.print(time);
+    const float margin = 0.1; // 0.1 == 10%
+    float k = (double)time / (double)one_EGG_Time_ms;
+
+    Serial.print("\t, k: ");  Serial.print(k);
+    Serial.print(", int(k): "); Serial.print(int(k));
+
+    if (k < abs(1.0f - margin))
+      return 0;
+    else {
+      egg_Count += (int)abs(k); // (int)k = no 0f eggs passed
+      return 1;
+    }
+  }
+
+};
+
+const int no_Of_EggCounters = 3;
+Egg_Counter Counter[no_Of_EggCounters] = {32, 34, 35}; //Pins of IR Sensors
+
+void setup() {
+  Serial.begin(115200);
+}
+
+void loop() {
+  Serial.printf("\nEgg Count: %d\t", egg_Count); Serial.print(millis());
+}
+

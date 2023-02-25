@@ -1,0 +1,52 @@
+const int no_Of_Sensors = 3;
+int Counter_Pins[no_Of_Sensors] = {32, 34, 35}; // Pins
+unsigned long time_Up[no_Of_Sensors] = {0, 0, 0};
+
+const unsigned long one_EGG_Time_ms = 2000;
+volatile int egg_Count = 0;
+
+
+void Edge_Detected(int serial) {
+  bool objectDetected = !digitalRead(Counter_Pins[serial]);
+  if (objectDetected == true) {
+    time_Up[serial] = millis();
+    Serial.print("\tObject Detected");
+  }
+  else {
+    Count(serial);
+    Serial.print("\tObject Passed");
+  }
+}
+bool Count(int serial) {
+    unsigned long time = millis() - time_Up[serial];
+    Serial.print("\t In Count: ");
+    Serial.print(time);
+    const float margin = 0.1;
+    float k = (double)time / (double)one_EGG_Time_ms;
+    Serial.print("\t, k: ");
+    Serial.print(k);
+    Serial.print(", int(k): ");
+    Serial.print(int(k));
+    if (k < abs(1.0f - margin))
+      return 0;
+    else {
+      egg_Count += (int)abs(k);
+      return 1;
+    }
+}
+
+void Handle_0() { Edge_Detected(0); }
+void Handle_1() { Edge_Detected(1); }
+void Handle_2() { Edge_Detected(2); }
+
+void setup() {
+  Serial.begin(115200);
+
+  attachInterrupt(digitalPinToInterrupt(Counter_Pins[0]), Handle_0, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(Counter_Pins[1]), Handle_1, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(Counter_Pins[2]), Handle_2, CHANGE);
+}
+
+void loop() {
+  Serial.printf("\nEgg Count: %d\t", egg_Count);
+}

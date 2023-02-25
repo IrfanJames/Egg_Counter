@@ -1,0 +1,59 @@
+const int no_Of_Sensors = 3;
+const int Counter_Pins[no_Of_Sensors] = {32, 34, 35}; // Pins
+
+volatile int egg_Count = 0;
+unsigned long time_Up[no_Of_Sensors] = {0, 0, 0};
+unsigned long one_EGG_Time_ms = 2000;
+
+hw_timer_t * timer = NULL;
+portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
+
+void IRAM_ATTR onTimer() {
+  portENTER_CRITICAL_ISR(&timerMux);
+  egg_Count += 1;
+  portEXIT_CRITICAL_ISR(&timerMux);
+}
+
+void Edge_Detected(int serial) {
+  static bool objectDetected[no_Of_Sensors] = {false, false, false};
+  bool newDetection = !digitalRead(Counter_Pins[serial]);
+
+  if (newDetection != objectDetected[serial]) {
+    if (newDetection) {
+      time_Up[serial] = micros();
+      //Serial.printf("\tObject Detected on pin %d\n", Counter_Pins[serial]);
+    } else {
+      //Serial.printf("\tObject Passed on pin %d\n", Counter_Pins[serial]);
+      unsigned long time = micros() - time_Up[serial];
+      const unsigned long margin_us = one_EGG_Time_ms * 1000 * 0.1; // 10% margin
+      if (time > one_EGG_Time_ms * 1000 - margin_us && time < one_EGG_Time_ms * 1000 + margin_us) {
+        // Successfully counted an egg
+        portENTER_CRITICAL(&timerMux);
+        egg_Count += 1;
+        portEXIT_CRITICAL(&timerMux);
+      }
+    }
+    objectDetected[serial] = newDetection;
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(Counter_Pins[0], INPUT_PULLUP);
+  pinMode(Counter_Pins[1], INPUT_PULLUP);
+  pinMode(Counter_Pins[2], INPUT_PULLUP);
+
+  // Set up a hardware timer to count the eggs
+  timer = timerBegin(0, 80, true);
+  timerAttachInterrupt(timer, &onTimer, true);
+  timerAlarmWrite(timer, 1000000, true); // 1 second
+  timerAlarmEnable(timer);
+}
+
+void loop() {
+  // Print the egg count every second
+  delay(1000);
+  portENTER_CRITICAL(&timerMux);
+  Serial.printf("Egg count: %d\n", egg_Count);
+  portEXIT_CRITICAL(&timerMux);
+}

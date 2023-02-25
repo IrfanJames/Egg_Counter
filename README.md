@@ -10,4 +10,4 @@
     * IR-Sensors
     * Double BTS7960 43a h Bridge
 * PCB Design
-  * Software: [Altrium](https://www.altium.com/)
+  * Software: [Altium](https://www.altium.com/)
