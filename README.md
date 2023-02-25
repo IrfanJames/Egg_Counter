@@ -8,6 +8,6 @@
   * Software: [Arduino IDE](https://www.arduino.cc/en/software)
   * Modules :
     * IR-Sensors
-    * Double BTS 7960 43a h Bridge
+    * Double BTS7960 43a h Bridge
 * PCB Design
   * Software: [Altrium](https://www.altium.com/)
